@@ -146,8 +146,7 @@ The application will be available at `http://localhost:3000`.
 ## API Documentation
 
 API documentation is available via Postman. Import the collection using the following link:
-[Postman Collection](https://api.postman.com/collections/34136503-a4604432-2c50-4ea6-ab89-c5cd2c2f3cbc?access_key=PMAT-01J3X3JJC22ZD636KP5F079VE7)
-
+[Postman Collection](#)
 ## Scripts
 
 ### Migration & Build Scripts
