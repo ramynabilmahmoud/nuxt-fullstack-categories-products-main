@@ -146,7 +146,7 @@ The application will be available at `http://localhost:3000`.
 ## API Documentation
 
 API documentation is available via Postman. Import the collection using the following link:
-[Postman Collection](#)
+[Postman Collection](https://raw.githubusercontent.com/ramynabilmahmoud/nuxt-fullstack-categories-products-main/main/nuxt-fullstack-categories-products.postman_collection.json)
 ## Scripts
 
 ### Migration & Build Scripts
