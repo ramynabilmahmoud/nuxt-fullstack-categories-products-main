@@ -18,32 +18,12 @@ The project implements CRUD operations for categories and products. It features 
 
 Ensure you have the following installed on your system:
 
-- Node.js (v14 or above)
-- npm, pnpm, yarn, or bun (package managers)
 - Docker
-- MySQL
+- Docker Compose
 
 ## Setup
 
-### 1. Install Dependencies
-
-Use your preferred package manager to install the required dependencies:
-
-```bash
-# npm
-npm install
-
-# pnpm
-pnpm install
-
-# yarn
-yarn install
-
-# bun
-bun install
-```
-
-### 2. Configure Environment Variables
+### 1. Configure Environment Variables
 
 Create a `.env` file in the root directory and set the following environment variables:
 
@@ -58,95 +38,47 @@ API_SECRET=<add-your-apisecret>
 
 Replace `user`, `password`, and `database_name` with your actual MySQL credentials.
 
-### 3. Database Setup
+### 2. Docker Deployment
 
-Run Prisma migrations to set up the database schema:
+#### Build and Run the Docker Containers
 
-```bash
-npx prisma migrate dev --name init
-```
+To build and run the application using Docker, follow these steps:
 
-### 4. Seed the Database (Optional)
+1. **Build the Docker Image**
 
-If you have seed data, use the following command to populate the database:
+   Build the Docker image for the Nuxt application:
 
-```bash
-npx prisma db seed
-```
+   ```bash
+   docker-compose build
+   ```
 
-## Development Server
+2. **Start the Containers**
 
-Start the development server on `http://localhost:3000`:
+   Start the containers using Docker Compose:
 
-```bash
-# npm
-npm run dev
+   ```bash
+   docker-compose up
+   ```
 
-# pnpm
-pnpm run dev
+   This will start the `nuxt-app` and `db` containers. The application will be available at `http://localhost:3000`.
 
-# yarn
-yarn dev
+3. **Access the Application**
 
-# bun
-bun run dev
-```
+   Once the containers are running, you can access the application in your web browser at `http://localhost:3000`.
 
-## Production
+4. **Stopping the Containers**
 
-### Build the Application
+   To stop the containers, use:
 
-Build the application for production:
-
-```bash
-# npm
-npm run build
-
-# pnpm
-pnpm run build
-
-# yarn
-yarn build
-
-# bun
-bun run build
-```
-
-### Preview Production Build
-
-Locally preview the production build:
-
-```bash
-# npm
-npm run preview
-
-# pnpm
-pnpm run preview
-
-# yarn
-yarn preview
-
-# bun
-bun run preview
-```
-
-Check out the [Nuxt 3 deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
-
-## Docker Deployment
-
-### Build and Run the Docker Container
-
-```bash
-docker build -t nuxt-fullstack-assignment .
-docker run -p 3000:3000 nuxt-fullstack-assignment
-```
-
-The application will be available at `http://localhost:3000`.
+   ```bash
+   docker-compose down
+   ```
 
 ## API Documentation
 
 API documentation is available via Postman. Import the collection using the following link:
 [Postman Collection](https://raw.githubusercontent.com/ramynabilmahmoud/nuxt-fullstack-categories-products-main/main/nuxt-fullstack-categories-products.postman_collection.json)
+
 ## Scripts
 
 ### Migration & Build Scripts
