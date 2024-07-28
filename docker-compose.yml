@@ -1,0 +1,27 @@
+version: "3.8"
+
+services:
+  nuxt-app:
+    build: .
+    container_name: nuxt-app
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=mysql://root:example@db:3306/nuxtdb
+    depends_on:
+      - db
+    command: npm run start
+
+  db:
+    image: mysql:8.0
+    container_name: mysql-db
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: example
+      MYSQL_DATABASE: nuxtdb
+    volumes:
+      - db_data:/var/lib/mysql
+
+volumes:
+  db_data:
