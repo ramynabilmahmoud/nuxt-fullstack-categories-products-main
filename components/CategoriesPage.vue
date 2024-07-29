@@ -37,17 +37,15 @@
                 </span>
                 <img
                   v-if="category.picture"
-                  :src="category.picture"
+                  :src="`${category.picture}`"
                   alt="Category Image"
-                  class="img-thumbnail me-4"
-                  style="width: 100px; height: 100px; object-fit: cover"
+                  style="width: 100px; height: 100px"
+                  class="img-thumbnail"
                 />
+
                 <div>
                   <h5 class="mb-1">{{ category.name }}</h5>
-                  <p class="mb-1"><strong>ID:</strong> {{ category.id }}</p>
-                  <p class="mb-1">
-                    <strong>Parent ID:</strong> {{ category.parent_id }}
-                  </p>
+                  <p class="mb-1"></p>
                   <p v-if="isTopLevel" class="mb-1">
                     <strong>Total Product count:</strong>
                     {{ category.productCount }}
@@ -57,6 +55,12 @@
                     @click="editCategory(category)"
                   >
                     Edit
+                  </button>
+                  <button
+                    class="btn btn-danger btn-sm mt-2 ms-2 ml-2"
+                    @click="handleDeleteCategory(category)"
+                  >
+                    Delete
                   </button>
                 </div>
               </div>
@@ -73,7 +77,6 @@
                   :key="child.id"
                   class="list-group-item"
                 >
-                  <!-- Render child content similar to parent -->
                   <div class="d-flex align-items-center">
                     <span
                       @click="toggleChildren(child)"
@@ -83,22 +86,28 @@
                     </span>
                     <img
                       v-if="child.picture"
-                      :src="child.picture"
+                      :src="`${child.picture}`"
                       alt="Category Image"
-                      class="img-thumbnail me-4"
-                      style="width: 80px; height: 80px; object-fit: cover"
+                      style="width: 100px; height: 100px"
+                      class="img-thumbnail"
                     />
+
                     <div>
-                      <h6 class="mb-1">{{ child.name }}</h6>
-                      <p class="mb-1"><strong>ID:</strong> {{ child.id }}</p>
                       <p class="mb-1">
-                        <strong>Parent ID:</strong> {{ child.parent_id }}
+                        <strong>{{ child.name }}</strong>
                       </p>
+
                       <button
                         class="btn btn-warning btn-sm mt-2"
                         @click="editCategory(child)"
                       >
                         Edit
+                      </button>
+                      <button
+                        class="btn btn-danger btn-sm mt-2 ms-2 ml-2"
+                        @click="handleDeleteCategory(child)"
+                      >
+                        Delete
                       </button>
                     </div>
                   </div>
@@ -110,138 +119,9 @@
       </div>
     </div>
 
-    <!-- Create Category Form -->
-    <div class="card mb-4">
-      <div class="card-header">
-        <h2 class="card-title">Create Category</h2>
-      </div>
-      <div class="card-body">
-        <form @submit.prevent="createCategory">
-          <div class="mb-3">
-            <label for="name" class="form-label">Category Name:</label>
-            <input
-              v-model="newCategory.name"
-              id="name"
-              type="text"
-              class="form-control"
-              required
-            />
-          </div>
-          <div class="mb-3">
-            <label for="picture" class="form-label">Picture:</label>
-            <input
-              @change="handleFileUpload($event, 'create')"
-              type="file"
-              class="form-control"
-              required
-            />
-          </div>
-          <div class="mb-3">
-            <label for="parent_id" class="form-label"
-              >Parent ID (optional):</label
-            >
-            <input
-              v-model.number="newCategory.parent_id"
-              id="parent_id"
-              type="number"
-              class="form-control"
-            />
-          </div>
-          <button type="submit" class="btn btn-primary">Create Category</button>
-        </form>
-        <div v-if="createError" class="alert alert-danger mt-3">
-          {{ createError }}
-        </div>
-        <div v-if="createSuccess" class="alert alert-success mt-3">
-          {{ createSuccess }}
-        </div>
-      </div>
-    </div>
-
-    <!-- Update Category Form -->
-    <div id="updateForm" class="card mb-4">
-      <div class="card-header">
-        <h2 class="card-title">Update Category</h2>
-      </div>
-      <div class="card-body">
-        <form @submit.prevent="updateCategory">
-          <div class="mb-3">
-            <label for="update_id" class="form-label">Category ID:</label>
-            <input
-              v-model.number="updateCategoryId"
-              id="update_id"
-              type="number"
-              class="form-control"
-              readonly
-            />
-          </div>
-          <div class="mb-3">
-            <label for="update_name" class="form-label"
-              >New Category Name:</label
-            >
-            <input
-              v-model="updateCategoryData.name"
-              id="update_name"
-              type="text"
-              class="form-control"
-            />
-          </div>
-          <div class="mb-3">
-            <label for="update_picture" class="form-label">New Picture:</label>
-            <input
-              @change="handleFileUpload($event, 'update')"
-              type="file"
-              class="form-control"
-            />
-          </div>
-          <div class="mb-3">
-            <label for="update_parent_id" class="form-label"
-              >New Parent ID (optional):</label
-            >
-            <input
-              v-model.number="updateCategoryData.parent_id"
-              id="update_parent_id"
-              type="number"
-              class="form-control"
-            />
-          </div>
-          <button type="submit" class="btn btn-warning">Update Category</button>
-        </form>
-        <div v-if="updateError" class="alert alert-danger mt-3">
-          {{ updateError }}
-        </div>
-        <div v-if="updateSuccess" class="alert alert-success mt-3">
-          {{ updateSuccess }}
-        </div>
-      </div>
-    </div>
-
-    <!-- Delete Category Form -->
-    <div class="card mb-4">
-      <div class="card-header">
-        <h2 class="card-title">Delete Category</h2>
-      </div>
-      <div class="card-body">
-        <form @submit.prevent="handleDeleteCategory">
-          <div class="mb-3">
-            <label for="delete_id" class="form-label">Category ID:</label>
-            <input
-              v-model.number="deleteCategoryId"
-              id="delete_id"
-              type="number"
-              class="form-control"
-              required
-            />
-          </div>
-          <button type="submit" class="btn btn-danger">Delete Category</button>
-        </form>
-        <div v-if="deleteError" class="alert alert-danger mt-3">
-          {{ deleteError }}
-        </div>
-        <div v-if="deleteSuccess" class="alert alert-success mt-3">
-          {{ deleteSuccess }}
-        </div>
-      </div>
+    <!-- Error Alert for Deletion -->
+    <div v-if="deleteError" class="alert alert-danger">
+      {{ deleteError }}
     </div>
 
     <!-- Confirmation Modal -->
@@ -291,9 +171,127 @@
         </div>
       </div>
     </div>
+
+    <div v-if="fetchError" class="alert alert-danger">
+      {{ fetchError }}
+    </div>
+
+    <!-- Create Category Form -->
+    <div class="card mb-4">
+      <div class="card-header">
+        <h2 class="card-title">Create Category</h2>
+      </div>
+      <div class="card-body">
+        <form @submit.prevent="createCategory">
+          <div class="mb-3">
+            <label for="name" class="form-label">Category Name:</label>
+            <input
+              v-model="newCategory.name"
+              id="name"
+              type="text"
+              class="form-control"
+              required
+            />
+          </div>
+          <div class="mb-3">
+            <label for="picture" class="form-label">Picture:</label>
+            <input
+              @change="handleFileUpload($event, 'create')"
+              type="file"
+              class="form-control"
+              required
+            />
+          </div>
+          <div class="mb-3">
+            <label for="parent_id" class="form-label"
+              >Parent Category (optional):</label
+            >
+            <select
+              v-model.number="newCategory.parent_id"
+              id="parent_id"
+              class="form-control"
+            >
+              <option value="">Select a parent category</option>
+              <option
+                v-for="category in categories"
+                :key="category.id"
+                :value="category.id"
+              >
+                {{ category.name }}
+              </option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary">Create Category</button>
+        </form>
+        <div v-if="createError" class="alert alert-danger mt-3">
+          {{ createError }}
+        </div>
+        <div v-if="createSuccess" class="alert alert-success mt-3">
+          {{ createSuccess }}
+        </div>
+        <div v-if="fetchError" class="alert alert-danger mt-3">
+          {{ fetchError }}
+        </div>
+      </div>
+    </div>
+
+    <!-- Update Category Form -->
+    <div id="updateForm" class="card mb-4">
+      <div class="card-header">
+        <h2 class="card-title">Update Category</h2>
+      </div>
+      <div class="card-body">
+        <form @submit.prevent="updateCategory">
+          <div class="mb-3">
+            <label for="update_name" class="form-label"
+              >New Category Name:</label
+            >
+            <input
+              v-model="updateCategoryData.name"
+              id="update_name"
+              type="text"
+              class="form-control"
+            />
+          </div>
+          <div class="mb-3">
+            <label for="update_picture" class="form-label">New Picture:</label>
+            <input
+              @change="handleFileUpload($event, 'update')"
+              type="file"
+              class="form-control"
+            />
+          </div>
+          <div class="mb-3">
+            <label for="parent_id" class="form-label"
+              >New Parent Category (optional):</label
+            >
+            <select
+              v-model.number="updateCategoryData.parent_id"
+              id="parent_id"
+              class="form-control"
+            >
+              <option value="">Select a parent category</option>
+              <option
+                v-for="category in categories"
+                :key="category.id"
+                :value="category.id"
+              >
+                {{ category.name }}
+              </option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-warning">Update Category</button>
+        </form>
+        <div v-if="updateError" class="alert alert-danger mt-3">
+          {{ updateError }}
+        </div>
+        <div v-if="updateSuccess" class="alert alert-success mt-3">
+          {{ updateSuccess }}
+        </div>
+      </div>
+    </div>
   </div>
 </template>
-
 <script setup>
 import { ref, onMounted } from "vue";
 import { useNuxtApp } from "#app";
@@ -314,10 +312,6 @@ const updateCategoryData = ref({
 });
 
 const props = defineProps({
-  tree: {
-    type: Array,
-    required: true,
-  },
   isTopLevel: {
     type: Boolean,
     default: true,
@@ -329,6 +323,7 @@ const editCategoryData = ref(null);
 const openCategories = ref(new Set());
 
 const categories = ref([]);
+const parentCategories = ref([]);
 const createError = ref(null);
 const createSuccess = ref(null);
 const updateError = ref(null);
@@ -375,7 +370,6 @@ const editCategory = (category) => {
   updateCategoryId.value = category.id;
   updateCategoryData.value = {
     name: category.name,
-    picture: category.picture,
     parent_id: category.parent_id,
   };
   // Scroll to the update form
@@ -393,12 +387,19 @@ const createCategory = async () => {
     });
     createSuccess.value = "Category created successfully!";
     createError.value = null;
+
     newCategory.value = {
       name: "",
       picture: "",
       parent_id: null,
-    }; // Reset form
-    fetchCategories(); // Refresh category list
+    };
+
+    const fileInput = document.querySelector('input[type="file"]');
+    if (fileInput) {
+      fileInput.value = "";
+    }
+
+    fetchCategories();
   } catch (err) {
     createError.value =
       "Failed to create category: " +
@@ -415,6 +416,10 @@ const updateCategory = async () => {
     });
     updateSuccess.value = "Category updated successfully!";
     updateError.value = null;
+    const fileInput = document.querySelector('input[type="file"]');
+    if (fileInput) {
+      fileInput.value = "";
+    }
     fetchCategories(); // Refresh category list
   } catch (err) {
     updateError.value =
@@ -424,25 +429,34 @@ const updateCategory = async () => {
   }
 };
 
-const handleDeleteCategory = () => {
-  $("#deleteConfirmationModal").modal("show");
+const handleDeleteCategory = (category) => {
+  deleteCategoryId.value = category.id; // Set the ID of the category to delete
+  $("#deleteConfirmationModal").modal("show"); // Show the confirmation modal
 };
 
 const confirmDeleteCategory = async () => {
   try {
-    await $fetch(`/api/categories?id=${deleteCategoryId.value}`, {
-      method: "DELETE",
-    });
-    deleteSuccess.value = "Category deleted successfully!";
+    const response = await $fetch(
+      `/api/categories?id=${deleteCategoryId.value}`,
+      {
+        method: "DELETE",
+      }
+    );
+
+    if (response.error) {
+      throw new Error(response.error);
+    }
+
+    deleteSuccess.value = response.message || "Category deleted successfully!";
     deleteError.value = null;
     deleteCategoryId.value = null; // Reset form
     $("#deleteConfirmationModal").modal("hide");
     fetchCategories(); // Refresh category list
   } catch (err) {
-    deleteError.value =
-      "Failed to delete category: " +
-      (err.response?.data?.error || err.message);
+    console.error("Delete error:", err);
+    deleteError.value = err.message || "Failed to delete category.";
     deleteSuccess.value = null;
+    $("#deleteConfirmationModal").modal("hide");
   }
 };
 
