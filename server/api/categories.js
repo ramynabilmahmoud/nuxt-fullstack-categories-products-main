@@ -1,14 +1,14 @@
 import { defineEventHandler, readBody, getQuery } from "h3";
 import { PrismaClient } from "@prisma/client";
-import cloudinary from "cloudinary";
+import fs from "fs";
+import path from "path";
 import sharp from "sharp";
+import { fileURLToPath } from "url";
 
-cloudinary.config({
-  cloud_name: process.env.CLOUD_NAME,
-  api_key: process.env.API_KEY,
-  api_secret: process.env.API_SECRET,
-});
 const prisma = new PrismaClient();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const projectRoot = path.resolve(__dirname, "..", "..");
 
 async function buildCategoryTree(categories) {
   const categoryMap = new Map();
@@ -82,41 +82,63 @@ export default defineEventHandler(async (event) => {
       case "POST":
         const createData = await readBody(event);
         let pictureUrl = "";
-        if (createData.picture) {
-          // Convert base64 string to buffer
-          const picture = createData.picture.substring(
-            createData.picture.indexOf(",") + 1
-          );
-          const imageBuffer = Buffer.from(picture, "base64");
-          // Resize the image to fit within 3200x3200
-          const resizedBuffer = await sharp(imageBuffer)
-            .resize(3200, 3200, { fit: "inside" })
-            .toBuffer();
+        let newCategory;
 
-          // Upload resized image to Cloudinary
-          pictureUrl = await new Promise((resolve, reject) => {
-            const uploadStream = cloudinary.v2.uploader.upload_stream(
-              { folder: "categories" }, // Optional: specify a folder in Cloudinary
-              (error, result) => {
-                if (error) {
-                  return reject(error);
-                }
-                resolve(result.secure_url);
-              }
-            );
-
-            // Stream the buffer to Cloudinary
-            uploadStream.end(resizedBuffer);
+        // Start a transaction to ensure data consistency
+        await prisma.$transaction(async (prisma) => {
+          // Step 1: Create the category without the picture URL
+          newCategory = await prisma.categories.create({
+            data: {
+              ...createData,
+              parent_id: createData.parent_id || null, // Ensure parent_id is correctly set or null if no parent
+              picture: "", // Temporary placeholder
+            },
           });
-        }
 
-        // Save the category with the image URL
-        const newCategory = await prisma.categories.create({
-          data: {
-            ...createData,
-            parent_id: createData.parent_id || null, // Ensure parent_id is correctly set or null if no parent
-            picture: pictureUrl,
-          },
+          // Step 2: Process the image if it exists
+          if (createData.picture) {
+            // Convert base64 string to buffer
+            const picture = createData.picture.substring(
+              createData.picture.indexOf(",") + 1
+            );
+            const imageBuffer = Buffer.from(picture, "base64");
+
+            // Resize the image to fit within 3200x3200
+            const resizedBuffer = await sharp(imageBuffer)
+              .resize(3200, 3200, { fit: "inside" })
+              .toBuffer();
+
+            // Define local directory and file name using the category ID
+            const uploadDir = path.join(
+              projectRoot,
+              "public",
+              "media",
+              "categories"
+            );
+            const fileName = `category_${newCategory.id}.jpg`;
+            const filePath = path.join(uploadDir, fileName);
+
+            // Ensure the directory exists
+            if (!fs.existsSync(uploadDir)) {
+              fs.mkdirSync(uploadDir, { recursive: true });
+            }
+
+            // Save the resized image to a local file
+            fs.writeFileSync(filePath, resizedBuffer);
+
+            // Set the picture URL to be used in the database
+            pictureUrl = `/media/categories/${fileName}`;
+          }
+
+          // Step 3: Update the category with the picture URL if the picture exists
+          if (pictureUrl) {
+            newCategory = await prisma.categories.update({
+              where: { id: newCategory.id },
+              data: {
+                picture: pictureUrl,
+              },
+            });
+          }
         });
 
         return newCategory;
@@ -134,38 +156,42 @@ export default defineEventHandler(async (event) => {
         let picUrl = currentCategory ? currentCategory.picture : null;
 
         if (updateData.picture) {
-          if (updateData.picture.startsWith("http")) {
-            // The new picture is a URL and should be used directly
-            if (updateData.picture !== picUrl) {
-              // Update URL if it's different
-              picUrl = updateData.picture;
-            }
-          } else {
-            // The new picture is in base64 format, so we need to process it
-            const picture = updateData.picture.substring(
-              updateData.picture.indexOf(",") + 1
-            );
-            const imageBuffer = Buffer.from(picture, "base64");
-            const resizedBuffer = await sharp(imageBuffer)
-              .resize(3200, 3200, { fit: "inside" })
-              .toBuffer();
+          // The new picture is in base64 format
+          const picture = updateData.picture.substring(
+            updateData.picture.indexOf(",") + 1
+          );
+          const imageBuffer = Buffer.from(picture, "base64");
+          const resizedBuffer = await sharp(imageBuffer)
+            .resize(3200, 3200, { fit: "inside" })
+            .toBuffer();
 
-            // Upload resized image to Cloudinary
-            picUrl = await new Promise((resolve, reject) => {
-              const uploadStream = cloudinary.v2.uploader.upload_stream(
-                { folder: "categories" }, // Optional: specify a folder in Cloudinary
-                (error, result) => {
-                  if (error) {
-                    return reject(error);
-                  }
-                  resolve(result.secure_url);
-                }
-              );
+          const uploadDir = path.join(
+            projectRoot,
+            "public",
+            "media",
+            "categories"
+          );
+          const fileName = `category_${updateId}.jpg`; // Use the category ID for the file name
+          const filePath = path.join(uploadDir, fileName);
 
-              // Stream the buffer to Cloudinary
-              uploadStream.end(resizedBuffer);
-            });
+          // Ensure the upload directory exists
+          if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
           }
+
+          // Remove the old image file if it exists and is different from the new file name
+          if (picUrl && picUrl !== `/media/categories/${fileName}`) {
+            const oldFilePath = path.join(projectRoot, "public", picUrl);
+            if (fs.existsSync(oldFilePath)) {
+              fs.unlinkSync(oldFilePath);
+            }
+          }
+
+          // Save the resized image locally
+          fs.writeFileSync(filePath, resizedBuffer);
+
+          // Set the new image URL (relative to the public directory)
+          picUrl = `/media/categories/${fileName}`;
         }
 
         // Update the category with new data
@@ -181,6 +207,15 @@ export default defineEventHandler(async (event) => {
 
       case "DELETE":
         const deleteId = Number(getQuery(event).id);
+        const categoryToDelete = await prisma.categories.findUnique({
+          where: { id: deleteId },
+        });
+
+        if (!categoryToDelete) {
+          return {
+            error: "Category does not exist",
+          };
+        }
 
         // Check for associated products and children before deletion
         const childCategories = await prisma.categories.findMany({
@@ -192,14 +227,24 @@ export default defineEventHandler(async (event) => {
 
         if (childCategories.length > 0 || productsInCategory.length > 0) {
           return {
-            message:
+            error:
               "Category has associated records. Handle them before deletion.",
           };
+        }
+
+        const pic = categoryToDelete.picture;
+        if (pic && pic.startsWith("/media/categories/")) {
+          const filePath = path.join(projectRoot, "public", pic);
+
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+          }
         }
 
         await prisma.categories.delete({
           where: { id: deleteId },
         });
+
         return { message: "Category deleted successfully" };
 
       default:

@@ -22,7 +22,7 @@
           v-if="categories.length === 0 && !fetchError"
           class="alert alert-warning"
         >
-          No categories available.
+          No Products available.
         </div>
         <div v-else>
           <div v-for="category in categories" :key="category.id" class="mb-4">
@@ -37,7 +37,7 @@
                 class="list-group-item d-flex align-items-center mb-2"
               >
                 <img
-                  v-if="product.picture"
+                  v-if="`/media/products/${product.picture}`"
                   :src="product.picture"
                   alt="Product Image"
                   class="img-thumbnail me-4"
@@ -45,13 +45,18 @@
                 />
                 <div class="ml-4">
                   <h5 class="mb-1">{{ product.name }}</h5>
-                  <p class="mb-1">ID: {{ product.id }}</p>
                 </div>
                 <button
                   @click="editProduct(product)"
-                  class="btn btn-secondary ms-auto ml-4"
+                  class="btn btn-warning ms-auto me-2 ml-2"
                 >
                   Edit
+                </button>
+                <button
+                  @click="handleDeleteProduct(product.id)"
+                  class="btn btn-danger ml-2"
+                >
+                  Delete
                 </button>
               </li>
             </ul>
@@ -60,7 +65,7 @@
       </div>
     </div>
 
-    <!-- Create Product Form -->
+    <!-- Create Category Form -->
     <div class="card mb-4">
       <div class="card-header">
         <h2 class="card-title">Create Product</h2>
@@ -78,22 +83,31 @@
             />
           </div>
           <div class="mb-3">
-            <label for="picture" class="form-label">Product Picture:</label>
+            <label for="picture" class="form-label">Picture:</label>
             <input
               @change="handleFileUpload($event, 'create')"
               type="file"
               class="form-control"
+              required
             />
           </div>
           <div class="mb-3">
-            <label for="category_id" class="form-label">Category ID:</label>
-            <input
+            <label for="category_id" class="form-label">Category</label>
+            <select
               v-model.number="newProduct.category_id"
               id="category_id"
-              type="number"
               class="form-control"
               required
-            />
+            >
+              <option value="">Select a parent category</option>
+              <option
+                v-for="category in categories"
+                :key="category.id"
+                :value="category.id"
+              >
+                {{ category.name }}
+              </option>
+            </select>
           </div>
           <button type="submit" class="btn btn-primary">Create Product</button>
         </form>
@@ -102,6 +116,9 @@
         </div>
         <div v-if="createSuccess" class="alert alert-success mt-3">
           {{ createSuccess }}
+        </div>
+        <div v-if="fetchError" class="alert alert-danger mt-3">
+          {{ fetchError }}
         </div>
       </div>
     </div>
@@ -113,16 +130,6 @@
       </div>
       <div class="card-body">
         <form @submit.prevent="updateProduct">
-          <div class="mb-3">
-            <label for="update_id" class="form-label">Product ID:</label>
-            <input
-              v-model.number="updateProductId"
-              id="update_id"
-              type="number"
-              class="form-control"
-              readonly
-            />
-          </div>
           <div class="mb-3">
             <label for="update_name" class="form-label"
               >New Product Name:</label
@@ -143,15 +150,21 @@
             />
           </div>
           <div class="mb-3">
-            <label for="update_category_id" class="form-label"
-              >New Category ID:</label
-            >
-            <input
-              v-model.number="updateProductData.category_id"
-              id="update_category_id"
-              type="number"
+            <label for="category_id" class="form-label">New Category</label>
+            <select
+              v-model.number="newProduct.category_id"
+              id="category_id"
               class="form-control"
-            />
+            >
+              <option value="">Select a New parent category</option>
+              <option
+                v-for="category in categories"
+                :key="category.id"
+                :value="category.id"
+              >
+                {{ category.name }}
+              </option>
+            </select>
           </div>
           <button type="submit" class="btn btn-warning">Update Product</button>
         </form>
@@ -160,34 +173,6 @@
         </div>
         <div v-if="updateSuccess" class="alert alert-success mt-3">
           {{ updateSuccess }}
-        </div>
-      </div>
-    </div>
-
-    <!-- Delete Product Form -->
-    <div class="card mb-4">
-      <div class="card-header">
-        <h2 class="card-title">Delete Product</h2>
-      </div>
-      <div class="card-body">
-        <form @submit.prevent="handleDeleteProduct">
-          <div class="mb-3">
-            <label for="delete_id" class="form-label">Product ID:</label>
-            <input
-              v-model.number="deleteProductId"
-              id="delete_id"
-              type="number"
-              class="form-control"
-              required
-            />
-          </div>
-          <button type="submit" class="btn btn-danger">Delete Product</button>
-        </form>
-        <div v-if="deleteError" class="alert alert-danger mt-3">
-          {{ deleteError }}
-        </div>
-        <div v-if="deleteSuccess" class="alert alert-success mt-3">
-          {{ deleteSuccess }}
         </div>
       </div>
     </div>
@@ -272,9 +257,7 @@ const fetchProductsAndCategories = async () => {
     if (response.error) throw new Error(response.error);
 
     // Filter categories to include only those with products
-    categories.value = response.filter(
-      (category) => category.products.length > 0
-    );
+    categories.value = response;
     fetchError.value = null;
   } catch (err) {
     fetchError.value =
@@ -299,7 +282,11 @@ const createProduct = async () => {
       name: "",
       picture: "",
       category_id: null,
-    }; // Reset form
+    };
+    const fileInput = document.querySelector('input[type="file"]');
+    if (fileInput) {
+      fileInput.value = "";
+    }
     fetchProductsAndCategories(); // Refresh product list
   } catch (err) {
     createError.value = "Failed to create product: " + err.message;
@@ -319,6 +306,10 @@ const updateProduct = async () => {
 
     updateSuccess.value = "Product updated successfully!";
     updateError.value = null;
+    const fileInput = document.querySelector('input[type="file"]');
+    if (fileInput) {
+      fileInput.value = "";
+    }
     fetchProductsAndCategories(); // Refresh product list
   } catch (err) {
     updateError.value = "Failed to update product: " + err.message;
@@ -330,16 +321,16 @@ const editProduct = (product) => {
   updateProductId.value = product.id;
   updateProductData.value = {
     name: product.name,
-    picture: product.picture,
     category_id: product.category_id,
   };
   const updateForm = document.getElementById("updateForm");
   if (updateForm) {
-    updateForm.scrollIntoView();
+    updateForm.scrollIntoView({ behavior: "smooth" });
   }
 };
 
-const handleDeleteProduct = () => {
+const handleDeleteProduct = (deleteId) => {
+  deleteProductId.value = deleteId;
   $("#deleteConfirmationModal").modal("show");
 };
 

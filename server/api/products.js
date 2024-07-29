@@ -1,31 +1,21 @@
 import { defineEventHandler, readBody, getQuery } from "h3";
 import { PrismaClient } from "@prisma/client";
-import cloudinary from "cloudinary";
+import fs from "fs";
+import path from "path";
 import sharp from "sharp";
-
-cloudinary.config({
-  cloud_name: process.env.CLOUD_NAME,
-  api_key: process.env.API_KEY,
-  api_secret: process.env.API_SECRET,
-});
+import { fileURLToPath } from "url";
 
 const prisma = new PrismaClient();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const projectRoot = path.resolve(__dirname, "..", "..");
 
 export default defineEventHandler(async (event) => {
   const method = event.node.req.method;
-  const { parentId } = getQuery(event);
 
   try {
     switch (method) {
-      // case "GET":
-
-      //   // Fetch all products including their associated category
-      //   const products = await prisma.products.findMany({
-      //     include: { category: true },
-      //   });
-      //   return products;
       case "GET":
-        // Fetch parent categories (where parentId is null)
         const parentCategories = await prisma.categories.findMany({
           where: { parent_id: null }, // Only fetch parent categories
           include: {
@@ -45,13 +35,19 @@ export default defineEventHandler(async (event) => {
             ...parent.children.flatMap((child) => child.products),
           ],
         }));
-
         return result;
 
       case "POST":
-        // Create a new product
         const createData = await readBody(event);
         let pictureUrl = "";
+
+        // Create the product first to get the ID
+        const newProduct = await prisma.products.create({
+          data: {
+            ...createData,
+            picture: "", // Temporarily set the picture to an empty string
+          },
+        });
 
         if (createData.picture) {
           // Convert base64 string to buffer
@@ -60,31 +56,42 @@ export default defineEventHandler(async (event) => {
           );
           const imageBuffer = Buffer.from(picture, "base64");
 
-          // Resize the image if necessary
+          // Resize the image to fit within 3200x3200
           const resizedBuffer = await sharp(imageBuffer)
             .resize(3200, 3200, { fit: "inside" })
             .toBuffer();
 
-          // Upload to Cloudinary
-          pictureUrl = await new Promise((resolve, reject) => {
-            const uploadStream = cloudinary.v2.uploader.upload_stream(
-              { folder: "products" },
-              (error, result) => {
-                if (error) return reject(error);
-                resolve(result.secure_url);
-              }
-            );
-            uploadStream.end(resizedBuffer);
+          // Define local directory and file name
+          const uploadDir = path.join(
+            projectRoot,
+            "public",
+            "media",
+            "products"
+          );
+
+          const fileName = `product_${newProduct.id}.jpg`; // Use the new product ID for the file name
+          const filePath = path.join(uploadDir, fileName);
+
+          // Ensure the directory exists
+          if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+          }
+
+          // Save the resized image to a local file
+          fs.writeFileSync(filePath, resizedBuffer);
+
+          // Set the picture URL to be used in the database
+          pictureUrl = `/media/products/${fileName}`;
+
+          // Update the product with the picture URL
+          await prisma.products.update({
+            where: { id: newProduct.id },
+            data: { picture: pictureUrl },
           });
         }
 
-        const newProduct = await prisma.products.create({
-          data: {
-            ...createData,
-            picture: pictureUrl,
-          },
-        });
         return newProduct;
+
       case "PUT":
         const updateId = Number(getQuery(event).id);
         const updateData = await readBody(event);
@@ -98,38 +105,34 @@ export default defineEventHandler(async (event) => {
         let picUrl = currentProduct ? currentProduct.picture : null;
 
         if (updateData.picture) {
-          if (updateData.picture.startsWith("http")) {
-            // The new picture is a URL and should be used directly
-            if (updateData.picture !== picUrl) {
-              // Update URL if it's different
-              picUrl = updateData.picture;
-            }
-          } else {
-            // The new picture is in base64 format, so we need to process it
-            const picture = updateData.picture.substring(
-              updateData.picture.indexOf(",") + 1
-            );
-            const imageBuffer = Buffer.from(picture, "base64");
-            const resizedBuffer = await sharp(imageBuffer)
-              .resize(3200, 3200, { fit: "inside" })
-              .toBuffer();
+          // The new picture is in base64 format
+          const picture = updateData.picture.substring(
+            updateData.picture.indexOf(",") + 1
+          );
+          const imageBuffer = Buffer.from(picture, "base64");
+          const resizedBuffer = await sharp(imageBuffer)
+            .resize(3200, 3200, { fit: "inside" })
+            .toBuffer();
 
-            // Upload resized image to Cloudinary
-            picUrl = await new Promise((resolve, reject) => {
-              const uploadStream = cloudinary.v2.uploader.upload_stream(
-                { folder: "products" }, // Optional: specify a folder in Cloudinary
-                (error, result) => {
-                  if (error) {
-                    return reject(error);
-                  }
-                  resolve(result.secure_url);
-                }
-              );
+          const uploadDir = path.join(
+            projectRoot,
+            "public",
+            "media",
+            "products"
+          );
+          const fileName = `product_${updateId}.jpg`;
+          const filePath = path.join(uploadDir, fileName);
 
-              // Stream the buffer to Cloudinary
-              uploadStream.end(resizedBuffer);
-            });
+          // Ensure the upload directory exists
+          if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
           }
+
+          // Save the resized image locally
+          fs.writeFileSync(filePath, resizedBuffer);
+
+          // Set the new image URL (relative to the public directory)
+          picUrl = `/media/products/${fileName}`;
         }
 
         // Update the category with new data
@@ -144,13 +147,28 @@ export default defineEventHandler(async (event) => {
         return updatedProduct;
 
       case "DELETE":
-        // Delete a product
         const deleteId = Number(getQuery(event).id);
+        const productToDelete = await prisma.products.findUnique({
+          where: { id: deleteId },
+        });
+
+        if (!productToDelete) {
+          return {
+            error: "Product does not exist",
+          };
+        }
+        const pic = productToDelete.picture;
+        if (pic && pic.startsWith("/media/products/")) {
+          const filePath = path.join(projectRoot, "public", pic);
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+          }
+        }
         await prisma.products.delete({
           where: { id: deleteId },
         });
-        return { message: "Product deleted successfully" };
 
+        return { message: "product deleted successfully" };
       default:
         return "Method not allowed";
     }
