@@ -29,6 +29,7 @@ Create a `.env` file in the root directory and set the following environment var
 
 ```bash
 DATABASE_URL="mysql://user:password@localhost:3306/database_name"
+```
 
 Replace `user`, `password`, and `database_name` with your actual MySQL credentials.
 
